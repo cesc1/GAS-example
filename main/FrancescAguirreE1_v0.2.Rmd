@@ -63,7 +63,11 @@ library(stringr)
 ```
 
 ```{r}
-asthma <- read.table("asthma.txt", header=TRUE)
+setwd("..")
+root_path = getwd()
+
+asthma <- read.table(paste0(root_path, "/data/asthma.txt"), header=TRUE)
+source(paste0(root_path, "/code/GEA.R"))
 ```
 
 S'utilitzarà el paquet estadístic **SNPassoc** per facilitar l'anàlisi dels SNPs, i el paquet **magrittr** per la creació de pipelines. També s'utilitzen algunes funcions de **purrr** per aplicar funcions similars a apply. Els paquets **rvest** i **stringr** s'han utilitzat per l'exercici personal opcional de web scrapping.
@@ -81,24 +85,10 @@ S'eliminaran tots els SNPs en els que s'ha perdut el valor en més de 5% d'indiv
 
 Codi (Annex: 1.2.1)
 
-```{r echo = T, eval = F}
+```{r echo = T, eval = T}
 # Funció: Elimina els SNPs que superen cert percentatge d'NA
-remove_NA <- function(data, maxPerc = 1)
+args(remove_NA)
 ```
-```{r ex1.2.1, echo = F, eval = T}
-remove_NA <- function(data, maxPerc = 1) {
-  if(!is(data, "setupSNP")){
-    stop("Class error. Object data needs to be from class setupSNP (library SNPassoc).")
-  }
-  invisible(capture.output(
-    res <- summary(data)))
-  snpNamesOut <- rownames(res)[res$missing > maxPerc]
-  columnOut <- colnames(data) %in% snpNamesOut
-  
-  return(data[, !columnOut])
-}
-```
-
 
 ### 1.2.2 HWE Control
 
@@ -106,38 +96,25 @@ Es comprobaran les freqüències dels anels individuals amb les poblacionals a p
 
 Codi (Annex: 1.2.2)
 
-```{r echo = T, eval = F}
+```{r}
 # Funció: Elimina els SNPs que no compleixen les condicions de HWE sobre la distribucio dels controls
-remove_HWE <- function(data, strat_name, reflevel = 2, signif = 0.05)
+args(remove_HWE)
 ```
-```{r ex1.2.2, echo = F, eval = T}
-remove_HWE <- function(data, strat_name, reflevel = 2, signif = 0.05){
-  if(!is(data, "setupSNP")){
-    stop("Class error. Object data needs to be from class setupSNP (library SNPassoc).")
-  }
-  if(missing(strat_name)){
-    res <- tableHWE(data)
-    reflevel <- "HWE (p value)"
-  } else{
-    res <- tableHWE(data, data[, strat_name])
-  }
-  snpNamesOut <- rownames(res)[res[, reflevel] < signif]
-  columnOut <- colnames(data) %in% snpNamesOut
-  
-  return(data[, !columnOut])
-}
-```
+
 
 ### 1.2.3 Aplicant pipeline
 
 S'apliquen les transformacions anteriors en ordre. Primer transformem les dades en classe **snp**, tot seguit eliminem els SNPs amb NAs superiors al 5%, i finalment eliminem SNPs que no compleixin el test de HWE, estratificant per controls.
 
 ```{r}
+first_col_SNP <- 7
+
 dat <- asthma %>%
-  setupSNP(colSNPs = 7:ncol(asthma), sep = "/") %>%
+  setupSNP(colSNPs = first_col_SNP:ncol(asthma), sep = "/") %>%
   remove_NA(maxPerc = 5) %>%
   remove_HWE(strat_name = "caco", reflevel = "0")
 
+snp_names <- names(dat)[first_col_SNP:ncol(dat)]
 dim(dat)
 ```
 
@@ -158,41 +135,19 @@ Veiem que totes les variables són significatives, i hi ha països que disminuei
 
 ### 1.4.1 Calculant els models
 
-Per cada SNP, es crearan 3 models logistics: Dominant, Recessiu i log-Aditiu. Es seleccionarà el model amb amb el p-valor més baix dels 3.
+Per cada SNP, es crearan 3 models logistics: Dominant, Recessiu i log-Aditiu. Es seleccionarà el model amb el p-valor més baix dels 3.
 
 Codi (Annex: 1.4.1)
 
-```{r echo = T, eval = F}
+```{r echo = T, eval = T}
 # Funció que crea els models logistics per un SNP i extrau la informació del model mes significatiu.
-associationOut <- function(snpID, data)
-```
-```{r ex1.4.1, echo = F, eval = T}
-# association(caco ~ country + gender + age + bmi + rs898070, data = dat)
-associationOut <- function(snpID, data) {
-  formula <- caco ~ country + gender + age + bmi + get(snpID)
-  mod_dom <- association(formula, data = data, model = "dominant")
-  mod_rec <- association(formula, data = data, model = "recessive")
-  mod_add <- association(formula, data = data, model = "log-additive")
-  # Extraiem els valors del model
-  matrx_res <- rbind(c(mod_dom[3, "OR"], mod_dom[2, "p-value"]), 
-                     c(mod_rec[3, "OR"], mod_rec[2, "p-value"]), 
-                     c(mod_add[2, c("OR", "p-value")]))
-  # S'ajunta en un dataframe per treballar mes comodament
-  data_res <- data.frame(snpID = snpID,
-                         Model_Type = c("Dominant", "Recessiu", "Additiu"), 
-                         matrx_res)
-  colnames(data_res) <- c("ID", "Model_type", "OR", "P_value")
-  # Seleccio del millor model
-  min_pval <- which.min(data_res$P_value)
-  return(data_res[min_pval, ])
-}
+args(associationOut)
 ```
 
 ```{r, warning = F}
-snp_names <- names(dat)[7:ncol(dat)]
-
 taula_resultats <- snp_names %>%
-  lapply(associationOut, data = dat) %>%
+  lapply(associationOut, base_formula = "caco ~ country + gender + age + bmi",
+         data = dat) %>%
   do.call(what = rbind)
 
 taula_resultats$P_value_adj <- p.adjust(taula_resultats$P_value, method = "BH")
@@ -203,100 +158,31 @@ Ja tenim la taula amb els p-valors ajustats!
 
 ### 1.4.2 Busqueda del gen de l'SNP
 
-Per fer l'anàlisi de xarxes de gens, s'ha de saber de quin gens provenen els SNPs més significatius. També és útil saber en quin cromosoma i posició estan si volem dibuixar un manhattan plot. 
+Per fer l'anàlisi de xarxes de gens, s'ha de saber de quin gens provenen els SNPs més significatius. També és útil saber en quin cromosoma i posició estan si volem dibuixar un manhattan plot en una secció especifica.
 
 Tenim diferents opcions per obtenir aquesta informació:
 
 1. Anar a [dbSNP](https://www.ncbi.nlm.nih.gov/snp/) i buscar aquesta informació manualment. És viable quan tenim una quantitat de SNPs significatius petita, com és el nostre cás.
 
-2. Utilitzar **web scrapping**. Anar a una web i extreure la informació manualment és un procés repetitiu. Programar pot servir per automatitzar aquests processos.  
+2. Utilitzar **web scrapping**. Anar a una web i extreure la informació que volem manualment, pot ser un procés repetitiu. Programar pot servir per automatitzar aquests processos.  
 
 3. Busqueda directa a partir d'una base de dades que ja contingui aquesta informació. És una opció molt més ràpida que web scrapping, per quan tenim grans quantitats de dades (ej: Utilitzant SQL).
 
 Ja que s'ha esmentat web scrapping com a opció, s'ha realitzat un exemple d'aquesta tècnica amb els SNPs del nostre anàlisi per il·lustrar aquest procés.
 
-Utilitzar web scrapping en el meu ordinador personal tarda al voltant d'1s/busqueda. És més ràpid que fer-ho manualment, però tampoc és poden fer milers de busquedes sense gastar hores.
+Utilitzar web scrapping en el meu ordinador personal tarda al voltant d'1s/busqueda. És més ràpid que fer-ho manualment, però tampoc és poden fer milers de busquedes sense gastar hores de capacitat computacional en un ordinador personal.
 
 Codi (Annex: 1.4.2)
 
-```{r echo = T, eval = F}
+```{r}
+source(paste0(root_path, "/code/webScrappingSNP.R"))
+
 # Llegeix la web en format html, i selecciona taula d'informació que volem.
-load_ncbi_datanode <- function(snp)
-# De la taula html carregada, extreu la fila on hi ha informació sobre el gen.
-extractGen <- function(ncbi_datanode)
-# De la taula html carregada, extreu la fila on hi ha informació sobre el cromosoma.
-extractCh <- function(ncbi_datanode)
-```
-```{r ex1.4.2, echo = F, eval = T}
-
-load_ncbi_datanode <- function(snp){
-  url <- sprintf("https://www.ncbi.nlm.nih.gov/snp/?term=%s", snp)
-  web <- read_html(url)
-  datanode <- web %>%
-    html_nodes(".snpsum_dl_left_align") %>%
-    extract(1)
-  if(length(datanode) == 0){
-    warning(sprintf("No s'ha trobat l'snp: %s", snp))
-    return(NA)
-  }
-  return(datanode)
-}
-
-extractGen <- function(ncbi_datanode) {
-  if(is.na(ncbi_datanode)) 
-    return(NA)
-  
-  geneRow <- ncbi_datanode %>%
-    html_nodes("dt") %>%
-    html_text() %>%
-    str_remove("[: ]") %>% 
-    str_extract("Gene") %>%
-    is.na() %>%
-    not()
-  if(sum(geneRow) != 1){
-    if(sum(geneRow) > 1) warning("2 Columnes de Gene, mirar-ho, molt extrany.")
-    return(NA)
-  }
-  gen <- ncbi_datanode %>%
-    html_nodes("dd") %>%
-    html_text %>%
-    extract(which(geneRow)) %>%
-    str_split(" ") %>%
-    extract2(1) %>%
-    extract(1)
-  return(gen)
-}
-
-extractCh <- function(ncbi_datanode){
-  if(is.na(ncbi_datanode)) 
-    return(list(ch = NA, pos = NA))
-  
-  chRow <- ncbi_datanode %>%
-    html_nodes("dt") %>%
-    html_text() %>%
-    str_remove("[: ]") %>% 
-    str_extract("Chromosome") %>%
-    is.na() %>%
-    not()
-  if(sum(chRow) != 1){
-    if(sum(chRow) > 1) warning("2 Columnes de Chromosome, mirar-ho, molt extrany.")
-    return(NA)
-  }
-  
-  chromosome <- ncbi_datanode %>%
-    html_nodes("dd") %>%
-    html_text() %>%
-    extract(which(chRow)) %>%
-    str_split("\\n") %>%
-    extract2(1) %>%
-    extract(1) %>%
-    str_split(":") %>%
-    extract2(1)
-  if(length(chromosome) != 2)
-    warning("Hi ha algo que no funciona com el que s'espera en partir el cromosoma amb la posicio.")
-    
-  return(list(ch = chromosome[1], pos = chromosome[2]))
-}
+args(load_ncbi_datanode)
+# De la taula html carregada d'un snp, extreu el gen
+args(extractGen)
+# De la taula html carregada, extreu el cromosoma i posició
+args(extractCh)
 ```
 
 
@@ -304,10 +190,11 @@ extractCh <- function(ncbi_datanode){
 data_web <- lapply(snp_names, function(snp_name){
   datanode <- load_ncbi_datanode(snp_name)
   chromosoma = extractCh(datanode)
-  c(Gene = extractGen(datanode),
+  data.frame(Gene = extractGen(datanode),
              Ch = chromosoma$ch,
              Pos = chromosoma$pos)
-}) %>% do.call(what = rbind)
+}) %>% 
+  do.call(what = rbind)
 
 taula_resultats <- cbind(taula_resultats, data_web)
 ```
@@ -321,37 +208,20 @@ Un cop creada la taula, es pot ordenar, arrodonir...
 
 Codi (Annex: 1.4.3)
 
-```{r echo = T, eval = F}
-# Ordena els per alguna de les columnes, arrodoneix els digits i els transforma tipus char.
-rounding_Xtable <- function(data, digits, ordenar = NULL)
-```
-```{r ex1.4.3a, echo = F, eval = T}
-rounding_Xtable <- function(data, digits, ordenar = NULL){
-  if(any(!names(digits) %in% names(data))){
-    stop("Algun dels noms de digits no coincideix amb data")
-  }
-  if(!is.null(ordenar)){
-    if(any(!ordenar %in% names(data))) 
-      stop(sprintf("Variable %s no esta en data.", ordenar))
-    data <- data[order(data[, ordenar]), ]
-  }
-  new_matrix <- sapply(names(digits), function(idx){
-    outString <- paste0("%", digits[[idx]], "f")
-    return(sprintf(outString, data[, idx]))
-  })
-  data[, names(digits)] <- data.frame(new_matrix)
-  return(data)
-}
+```{r}
+# Arrodoneix els digits de les columnes que volem, i els transforma tipus char (per Xtable).
+# També es pot ordenar una de les columnes a priori. 
+args(rounding_Xtable)
 ```
 
 
-```{r ex1.4.3b, echo = F, eval = T, results = 'asis'}
+```{r echo = F, eval = T, results = 'asis'}
 taula_resultats %>%
-  rounding_Xtable(digits = list(OR = .2, P_value = .3, P_value_adj = .3),
+  rounding_Xtable(digits = list(OR = .2, P_value = .3, P_value_adj = .3, Pos = .2),
                   ordenar = "P_value") %>%
   xtable(caption = "Taula 1: Per cada SNP tenim l'identificador, el model utilitzat 
-  (model amb menor p-valor), l'OR, el p-valor, el p-valor ajustat per la correcció 
-  de Benjamini-Hochberg. Finalment tenim informació sobre l'SNP en concret.", label = "Taula1") %>%
+  (model amb menor p-valor), l'OR, el p-valor i el p-valor ajustat per la correcció 
+  de Benjamini-Hochberg. Finalment tenim informació sobre l'SNP en concret (gen, chromozoma, posició del   cromozoma en milions de bases).", label = "Taula1") %>%
   print(type = "html", include.rownames = FALSE)
 ```
 
@@ -368,13 +238,13 @@ Tot seguit s'anirà a [LocusZoom](http://locuszoom.org/genform.php?type=yourdata
 
 També s'ha d'indicar la regió. Gràcies a que s'ha extret l'informació de tots els gens a partir de web scrapping ho tenim força fàcil. Els p-valors ajustats significatius es troben en el cromosoma 7. La posició d'aquests és entre 34.6 i 35 milions de bases.
 
-![Gràfic 1](mahattanP7.png)
+![Gràfic 1](`r paste0(root_path, "/images/mahattanP7.png")`)
 
 
 
 # 2. Interpretació de resultats
 
-S'ha vist que els SNPs rs184448 i rs324981 són significatius en el model additiu, amb p-valors ajustats 0.014 i 0.024. L'SNP rs324960 en el model recessiu es podria arribar a tenir en compte tot i donar no significatiu, amb p-valor de 0.068. 
+S'ha vist que els SNPs rs184448 i rs324981 són significatius en el model additiu, amb p-valors ajustats 0.014 i 0.024. L'SNP rs324960 en el model recessiu es podria arribar a tenir en compte tot i donar no significatiu al 0.05, amb p-valor de 0.068. 
 
 L'SNP amb id rs184448 fa augmentar els odds de patir asma en un 45% més per cada al·lel minoritari afegit. En canvi, l'snp amb id rs324981 fa disminuir els odds de patir asma en un 39% menys per cada al·lel minoritari afegit. Per l'snp amb id rs324960, tenir el genotip homozigot minoritari fa disminuir els odds de patir asma en un 104%, tot i que no és significatiu en un 0.05 (molta volatilitat).
 
@@ -386,19 +256,16 @@ Observant el manhattan plot en el Gràfic 1, podem veure que els 3 p-valors més
 # ANNEX
 
 ### 1.2.1 Data Cleaning
-```{r ex1.2.1, echo = T, eval = F}
-```
+
 
 ### 1.2.2 HWE Control
-```{r ex1.2.2, echo = T, eval = F}
-```
+
 
 
 ## 1.4.1 Models d'associació
 
 Crea data.frame amb l'output del model amb p-valor més petit.
-```{r ex1.4.1, echo = T, eval = F}
-```
+
 
 
 
@@ -412,16 +279,12 @@ Explicació funcions:
 
 - **extractCh()**: Similar a extractGen() però amb la fila "Chromosome". S'ha suposat que per exemple: 7:34733498 (GRCh38), està en el cromosoma 7, posició 34733498 en en genoma homosapiens GRCh38.
 
-```{r ex1.4.2, echo = T, eval = F}
-```
+
 
 
 ## 1.4.3 Taula models d'associació
 
 Retoca la taula amb la informació dels models d'associació.
-```{r ex1.4.3a, echo = T, eval = F}
-```
+
 
 Executant xtable per la creació de la taula.
-```{r ex1.4.3b, echo = T, eval = F}
-```

@@ -1,0 +1,290 @@
+---
+title: "Entrega 1: Genetic Aassociation Studies"
+subtitle: "Big Data en Biociències"
+author: "Francesc Aguirre, 1398024"
+date: "Desembre de 2020"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+editor_options: 
+  chunk_output_type: console
+---
+
+<style type="text/css">
+
+body{ /* Normal  */
+      font-size: 16px;
+  }
+td {  /* Table  */
+  font-size: 18px;
+}
+h1.title {
+  font-size: 38px;
+  color: DarkRed;
+}
+h1 { /* Header 1 */
+  font-size: 28px;
+  color: DarkGreen;
+}
+h2 { /* Header 2 */
+    font-size: 22px;
+  color: DarkRed;
+}
+h3 { /* Header 3 */
+  font-size: 18px;
+  font-family: "Times New Roman", Times, serif;
+  color: DarkRed;
+}
+code.r{ /* Code block */
+    font-size: 16px;
+}
+
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(xtable)
+options(xtable.comment = FALSE)
+```
+
+
+# 1. Anàlisi de dades GAS amb R
+
+## 1.1 Obtenció de les dades i paquets
+
+```{r message = FALSE}
+library(SNPassoc)
+library(magrittr)
+
+library(rvest)
+library(stringr)
+```
+
+```{r}
+setwd("..")
+root_path = getwd()
+
+asthma <- read.table(paste0(root_path, "/data/asthma.txt"), header=TRUE)
+source(paste0(root_path, "/code/GEA.R"))
+```
+
+S'utilitzarà el paquet estadístic **SNPassoc** per facilitar l'anàlisi dels SNPs, i el paquet **magrittr** per la creació de pipelines. També s'utilitzen algunes funcions de **purrr** per aplicar funcions similars a apply. Els paquets **rvest** i **stringr** s'han utilitzat per l'exercici personal opcional de web scrapping.
+
+S'han utilitzat les dades d'un estudi epidemiologic sobre l'asma, que conté `r nrow(asthma)` individus agrupats en casos i controls. Es tenen `r ncol(asthma) - 6` SNPs, a més del país, sexe, edat, bmi i nivell d'obstrucció pulmonar. 
+
+El codi de totes les funcions personalitzades es pot veure a l'annex.
+
+
+## 1.2 Control de qualitat
+
+### 1.2.1 Data Cleaning
+
+S'eliminaran tots els SNPs en els que s'ha perdut el valor en més de 5% d'individus.
+
+Codi (Annex: 1.2.1)
+
+```{r echo = T, eval = T}
+# Funció: Elimina els SNPs que superen cert percentatge d'NA
+args(remove_NA)
+```
+
+### 1.2.2 HWE Control
+
+Es comprobaran les freqüències dels anels individuals amb les poblacionals a partir del test HWE. S'eliminaran tots els SNPs amb un p-valor no significatiu (menor que 0.05), dins de la distribució dels controls.
+
+Codi (Annex: 1.2.2)
+
+```{r}
+# Funció: Elimina els SNPs que no compleixen les condicions de HWE sobre la distribucio dels controls
+args(remove_HWE)
+```
+
+
+### 1.2.3 Aplicant pipeline
+
+S'apliquen les transformacions anteriors en ordre. Primer transformem les dades en classe **snp**, tot seguit eliminem els SNPs amb NAs superiors al 5%, i finalment eliminem SNPs que no compleixin el test de HWE, estratificant per controls.
+
+```{r}
+first_col_SNP <- 7
+
+dat <- asthma %>%
+  setupSNP(colSNPs = first_col_SNP:ncol(asthma), sep = "/") %>%
+  remove_NA(maxPerc = 5) %>%
+  remove_HWE(strat_name = "caco", reflevel = "0")
+
+snp_names <- names(dat)[first_col_SNP:ncol(dat)]
+dim(dat)
+```
+
+S'han eliminat `r ncol(asthma) - ncol(dat)` SNPs que no complien les condicions de qualitat.
+
+
+## 1.3 Selecció de variables no genètiques
+
+```{r}
+mod <- glm(caco ~ country + gender + age + bmi, family = binomial, data = dat)
+round(summary(mod)$coef, 3)
+```
+
+Veiem que totes les variables són significatives, i hi ha països que disminueixen les odds de tenir asma en referència a austràlia, i d'altres que no. Això ens diu, que ajustar els nostres models d'associació per aquestes variables pot ser encertat, per tal de disminuir el biaix quan es conclou que un SNP és significatiu.
+
+
+## 1.4 Models d'associació genètica
+
+### 1.4.1 Calculant els models
+
+Per cada SNP, es crearan 3 models logistics: Dominant, Recessiu i log-Aditiu. Es seleccionarà el model amb el p-valor més baix dels 3.
+
+Codi (Annex: 1.4.1)
+
+```{r echo = T, eval = T}
+# Funció que crea els models logistics per un SNP i extrau la informació del model mes significatiu.
+args(associationOut)
+```
+
+```{r, warning = F}
+taula_resultats <- snp_names %>%
+  lapply(associationOut, base_formula = "caco ~ country + gender + age + bmi",
+         data = dat) %>%
+  do.call(what = rbind)
+
+taula_resultats$P_value_adj <- p.adjust(taula_resultats$P_value, method = "BH")
+```
+
+Ja tenim la taula amb els p-valors ajustats!
+
+
+### 1.4.2 Busqueda del gen de l'SNP
+
+Per fer l'anàlisi de xarxes de gens, s'ha de saber de quin gens provenen els SNPs més significatius. També és útil saber en quin cromosoma i posició estan si volem dibuixar un manhattan plot en una secció especifica.
+
+Tenim diferents opcions per obtenir aquesta informació:
+
+1. Anar a [dbSNP](https://www.ncbi.nlm.nih.gov/snp/) i buscar aquesta informació manualment. És viable quan tenim una quantitat de SNPs significatius petita, com és el nostre cás.
+
+2. Utilitzar **web scrapping**. Anar a una web i extreure la informació que volem manualment, pot ser un procés repetitiu. Programar pot servir per automatitzar aquests processos.  
+
+3. Busqueda directa a partir d'una base de dades que ja contingui aquesta informació. És una opció molt més ràpida que web scrapping, per quan tenim grans quantitats de dades (ej: Utilitzant SQL).
+
+Ja que s'ha esmentat web scrapping com a opció, s'ha realitzat un exemple d'aquesta tècnica amb els SNPs del nostre anàlisi per il·lustrar aquest procés.
+
+Utilitzar web scrapping en el meu ordinador personal tarda al voltant d'1s/busqueda. És més ràpid que fer-ho manualment, però tampoc és poden fer milers de busquedes sense gastar hores de capacitat computacional en un ordinador personal.
+
+Codi (Annex: 1.4.2)
+
+```{r}
+source(paste0(root_path, "/code/webScrappingSNP.R"))
+
+# Llegeix la web en format html, i selecciona taula d'informació que volem.
+args(load_ncbi_datanode)
+# De la taula html carregada d'un snp, extreu el gen
+args(extractGen)
+# De la taula html carregada, extreu el cromosoma i posició
+args(extractCh)
+```
+
+
+```{r}
+data_web <- lapply(snp_names, function(snp_name){
+  datanode <- load_ncbi_datanode(snp_name)
+  chromosoma = extractCh(datanode)
+  data.frame(Gene = extractGen(datanode),
+             Ch = chromosoma$ch,
+             Pos = chromosoma$pos)
+}) %>% 
+  do.call(what = rbind)
+
+taula_resultats <- cbind(taula_resultats, data_web)
+```
+
+Podem veure que un dels SNPs no s'ha trobat, i particularment comença amb un prefix (hopo) diferent a la resta (rs).
+
+
+### 1.4.3 Taula de resultats
+
+Un cop creada la taula, es pot ordenar, arrodonir...
+
+Codi (Annex: 1.4.3)
+
+```{r}
+# Arrodoneix els digits de les columnes que volem, i els transforma tipus char (per Xtable).
+# També es pot ordenar una de les columnes a priori. 
+args(rounding_Xtable)
+```
+
+
+```{r echo = F, eval = T, results = 'asis'}
+taula_resultats %>%
+  rounding_Xtable(digits = list(OR = .2, P_value = .3, P_value_adj = .3, Pos = .2),
+                  ordenar = "P_value") %>%
+  xtable(caption = "Taula 1: Per cada SNP tenim l'identificador, el model utilitzat 
+  (model amb menor p-valor), l'OR, el p-valor i el p-valor ajustat per la correcció 
+  de Benjamini-Hochberg. Finalment tenim informació sobre l'SNP en concret (gen, chromozoma, posició del   cromozoma en milions de bases).", label = "Taula1") %>%
+  print(type = "html", include.rownames = FALSE)
+```
+
+
+## 1.4.4 Gràfics
+
+Farem un mini manhattan plot amb l'eina **LocusZoom**. Primer s'ha de guardar la taula en un fitxer.
+
+```{r echo = T, eval = F}
+write.table(taula_resultats, "taulaORs.txt", quote = FALSE, row.names = FALSE)
+```
+
+Tot seguit s'anirà a [LocusZoom](http://locuszoom.org/genform.php?type=yourdata) per fer el plot. S'entra el fitxer .txt generat, la columna de p-valors ajustats, s'indica la columna amb els noms dels SNPs i el delimitador s'especifica per espais. 
+
+També s'ha d'indicar la regió. Gràcies a que s'ha extret l'informació de tots els gens a partir de web scrapping ho tenim força fàcil. Els p-valors ajustats significatius es troben en el cromosoma 7. La posició d'aquests és entre 34.6 i 35 milions de bases.
+
+![Gràfic 1](`r paste0(root_path, "/images/mahattanP7.png")`)
+
+
+
+# 2. Interpretació de resultats
+
+S'ha vist que els SNPs rs184448 i rs324981 són significatius en el model additiu, amb p-valors ajustats 0.014 i 0.024. L'SNP rs324960 en el model recessiu es podria arribar a tenir en compte tot i donar no significatiu al 0.05, amb p-valor de 0.068. 
+
+L'SNP amb id rs184448 fa augmentar els odds de patir asma en un 45% més per cada al·lel minoritari afegit. En canvi, l'snp amb id rs324981 fa disminuir els odds de patir asma en un 39% menys per cada al·lel minoritari afegit. Per l'snp amb id rs324960, tenir el genotip homozigot minoritari fa disminuir els odds de patir asma en un 104%, tot i que no és significatiu en un 0.05 (molta volatilitat).
+
+Els SNPs que han perdut la significació després de ser ajustats són el rs324960, rs325462, rs2303063, rs324396 i rs1422993. En alguns casos, el p-valor s'ha multiplicat per 10 a l'ajustar (ex: rs325462, p-val: 0.020, p-val_aj: 0.210).
+
+Observant el manhattan plot en el Gràfic 1, podem veure que els 3 p-valors més significatius són propers entre ells, a una distància de menys de 0.07Mb, indicant que podríem estar veient una regió genètica amb  influència sobre l'asma.
+
+
+# ANNEX
+
+### 1.2.1 Data Cleaning
+
+
+### 1.2.2 HWE Control
+
+
+
+## 1.4.1 Models d'associació
+
+Crea data.frame amb l'output del model amb p-valor més petit.
+
+
+
+
+## 1.4.2 Web Scrapping
+
+Explicació funcions:
+
+- **load_ncbi_datanode()**: Llegeix la pàgina web en format html, i agafa la taula que volem llegir.
+
+- **extractGen()**: A partir de la taula que volem llegir, es mira quina fila coincideix amb la string "Gene". S'agafa el primer valor corresponent. Per millorar-la en comptes d'agafar el primer valor es podria aplicar un str_remove("[(Varview)]") per eliminar el link, però de moment ja funciona con s'esperaria.
+
+- **extractCh()**: Similar a extractGen() però amb la fila "Chromosome". S'ha suposat que per exemple: 7:34733498 (GRCh38), està en el cromosoma 7, posició 34733498 en en genoma homosapiens GRCh38.
+
+
+
+
+## 1.4.3 Taula models d'associació
+
+Retoca la taula amb la informació dels models d'associació.
+
+
+Executant xtable per la creació de la taula.

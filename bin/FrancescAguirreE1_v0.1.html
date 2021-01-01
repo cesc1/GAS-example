@@ -419,7 +419,7 @@ library(magrittr)
 
 library(rvest)
 library(stringr)</code></pre>
-<pre class="r"><code>asthma &lt;- read.table(&quot;asthma.txt&quot;, header=TRUE)</code></pre>
+<pre class="r"><code>asthma &lt;- read.table(&quot;data/asthma.txt&quot;, header=TRUE)</code></pre>
 <p>S’utilitzarà el paquet estadístic <strong>SNPassoc</strong> per facilitar l’anàlisi dels SNPs, i el paquet <strong>magrittr</strong> per la creació de pipelines. També s’utilitzen algunes funcions de <strong>purrr</strong> per aplicar funcions similars a apply. Els paquets <strong>rvest</strong> i <strong>stringr</strong> s’han utilitzat per l’exercici personal opcional de web scrapping.</p>
 <p>S’han utilitzat les dades d’un estudi epidemiologic sobre l’asma, que conté 1578 individus agrupats en casos i controls. Es tenen 51 SNPs, a més del país, sexe, edat, bmi i nivell d’obstrucció pulmonar.</p>
 <p>El codi de totes les funcions personalitzades es pot veure a l’annex.</p>
@@ -511,10 +511,11 @@ extractCh &lt;- function(ncbi_datanode)</code></pre>
 <pre class="r"><code>data_web &lt;- lapply(snp_names, function(snp_name){
   datanode &lt;- load_ncbi_datanode(snp_name)
   chromosoma = extractCh(datanode)
-  c(Gene = extractGen(datanode),
+  data.frame(Gene = extractGen(datanode),
              Ch = chromosoma$ch,
              Pos = chromosoma$pos)
-}) %&gt;% do.call(what = rbind)</code></pre>
+}) %&gt;% 
+  do.call(what = rbind)</code></pre>
 <pre><code>## Warning in load_ncbi_datanode(snp_name): No s&#39;ha trobat l&#39;snp: hopo546333</code></pre>
 <pre class="r"><code>taula_resultats &lt;- cbind(taula_resultats, data_web)</code></pre>
 <p>Podem veure que un dels SNPs no s’ha trobat, i particularment comença amb un prefix (hopo) diferent a la resta (rs).</p>
@@ -578,7 +579,7 @@ NPSR1
 7
 </td>
 <td>
-34733498
+34.73
 </td>
 </tr>
 <tr>
@@ -604,7 +605,7 @@ NPSR1
 7
 </td>
 <td>
-34778501
+34.78
 </td>
 </tr>
 <tr>
@@ -630,7 +631,7 @@ NPSR1
 7
 </td>
 <td>
-34762779
+34.76
 </td>
 </tr>
 <tr>
@@ -656,7 +657,7 @@ NPSR1
 7
 </td>
 <td>
-34810234
+34.81
 </td>
 </tr>
 <tr>
@@ -682,7 +683,7 @@ SPINK5
 5
 </td>
 <td>
-148100464
+148.10
 </td>
 </tr>
 <tr>
@@ -708,7 +709,7 @@ NPSR1
 7
 </td>
 <td>
-34750511
+34.75
 </td>
 </tr>
 <tr>
@@ -734,7 +735,7 @@ SPINK5
 5
 </td>
 <td>
-148124257
+148.12
 </td>
 </tr>
 <tr>
@@ -760,7 +761,7 @@ NPSR1
 7
 </td>
 <td>
-34763115
+34.76
 </td>
 </tr>
 <tr>
@@ -786,7 +787,7 @@ GFRA4
 20
 </td>
 <td>
-3663006
+3.66
 </td>
 </tr>
 <tr>
@@ -812,7 +813,7 @@ NPSR1
 7
 </td>
 <td>
-34780689
+34.78
 </td>
 </tr>
 <tr>
@@ -838,7 +839,7 @@ NPSR1
 7
 </td>
 <td>
-34834426
+34.83
 </td>
 </tr>
 <tr>
@@ -862,6 +863,7 @@ Additiu
 <td>
 </td>
 <td>
+NA
 </td>
 </tr>
 <tr>
@@ -887,7 +889,7 @@ PHF11
 13
 </td>
 <td>
-49529275
+49.53
 </td>
 </tr>
 <tr>
@@ -912,7 +914,7 @@ Dominant
 2
 </td>
 <td>
-114439177
+114.44
 </td>
 </tr>
 <tr>
@@ -938,7 +940,7 @@ NPSR1
 7
 </td>
 <td>
-34659253
+34.66
 </td>
 </tr>
 <tr>
@@ -964,7 +966,7 @@ SPINK5
 5
 </td>
 <td>
-148063216
+148.06
 </td>
 </tr>
 <tr>
@@ -990,7 +992,7 @@ NPSR1-AS1
 7
 </td>
 <td>
-34653614
+34.65
 </td>
 </tr>
 <tr>
@@ -1016,7 +1018,7 @@ ADAM33
 20
 </td>
 <td>
-3667731
+3.67
 </td>
 </tr>
 <tr>
@@ -1041,7 +1043,7 @@ Additiu
 20
 </td>
 <td>
-3685608
+3.69
 </td>
 </tr>
 <tr>
@@ -1067,7 +1069,7 @@ NPSR1
 7
 </td>
 <td>
-34859961
+34.86
 </td>
 </tr>
 <tr>
@@ -1093,7 +1095,7 @@ PHF11
 13
 </td>
 <td>
-49515889
+49.52
 </td>
 </tr>
 <tr>
@@ -1118,7 +1120,7 @@ Recessiu
 2
 </td>
 <td>
-114420979
+114.42
 </td>
 </tr>
 <tr>
@@ -1144,7 +1146,7 @@ PHF11
 13
 </td>
 <td>
-49506711
+49.51
 </td>
 </tr>
 <tr>
@@ -1169,7 +1171,7 @@ Recessiu
 2
 </td>
 <td>
-114423472
+114.42
 </td>
 </tr>
 <tr>
@@ -1195,7 +1197,7 @@ PHF11
 13
 </td>
 <td>
-49524240
+49.52
 </td>
 </tr>
 <tr>
@@ -1221,7 +1223,7 @@ NPSR1
 7
 </td>
 <td>
-34847213
+34.85
 </td>
 </tr>
 <tr>
@@ -1247,7 +1249,7 @@ DPP10
 2
 </td>
 <td>
-114446859
+114.45
 </td>
 </tr>
 <tr>
@@ -1272,7 +1274,7 @@ Dominant
 2
 </td>
 <td>
-114435313
+114.44
 </td>
 </tr>
 <tr>
@@ -1297,7 +1299,7 @@ Dominant
 2
 </td>
 <td>
-114406882
+114.41
 </td>
 </tr>
 <tr>
@@ -1323,7 +1325,7 @@ SPINK5
 5
 </td>
 <td>
-148131303
+148.13
 </td>
 </tr>
 <tr>
@@ -1349,7 +1351,7 @@ ADAM33
 20
 </td>
 <td>
-3672502
+3.67
 </td>
 </tr>
 <tr>
@@ -1375,7 +1377,7 @@ NPSR1
 7
 </td>
 <td>
-34656767
+34.66
 </td>
 </tr>
 <tr>
@@ -1401,7 +1403,7 @@ DPP10
 2
 </td>
 <td>
-114500486
+114.50
 </td>
 </tr>
 <tr>
@@ -1427,7 +1429,7 @@ NPSR1
 7
 </td>
 <td>
-34849940
+34.85
 </td>
 </tr>
 <tr>
@@ -1453,7 +1455,7 @@ NPSR1
 7
 </td>
 <td>
-34672157
+34.67
 </td>
 </tr>
 <tr>
@@ -1479,7 +1481,7 @@ NPSR1
 7
 </td>
 <td>
-34684308
+34.68
 </td>
 </tr>
 <tr>
@@ -1505,7 +1507,7 @@ DPP10
 2
 </td>
 <td>
-114448456
+114.45
 </td>
 </tr>
 <tr>
@@ -1531,7 +1533,7 @@ DPP10
 2
 </td>
 <td>
-114456098
+114.46
 </td>
 </tr>
 <tr>
@@ -1557,7 +1559,7 @@ PHF11
 13
 </td>
 <td>
-49521817
+49.52
 </td>
 </tr>
 <tr>
@@ -1583,7 +1585,7 @@ PHF11
 13
 </td>
 <td>
-49513006
+49.51
 </td>
 </tr>
 <tr>
@@ -1609,7 +1611,7 @@ ADAM33
 20
 </td>
 <td>
-3675296
+3.68
 </td>
 </tr>
 <tr>
@@ -1635,7 +1637,7 @@ DPP10
 2
 </td>
 <td>
-114483103
+114.48
 </td>
 </tr>
 <tr>
@@ -1660,7 +1662,7 @@ Recessiu
 2
 </td>
 <td>
-114418053
+114.42
 </td>
 </tr>
 <a name="Taula1"></a>
@@ -1817,7 +1819,7 @@ extractCh &lt;- function(ncbi_datanode){
   if(length(chromosome) != 2)
     warning(&quot;Hi ha algo que no funciona com el que s&#39;espera en partir el cromosoma amb la posicio.&quot;)
     
-  return(list(ch = chromosome[1], pos = chromosome[2]))
+  return(list(ch = chromosome[1], pos = as.numeric(chromosome[2])/1e6))
 }</code></pre>
 </div>
 <div id="taula-models-dassociació" class="section level2">
@@ -1841,7 +1843,7 @@ extractCh &lt;- function(ncbi_datanode){
 }</code></pre>
 <p>Executant xtable per la creació de la taula.</p>
 <pre class="r"><code>taula_resultats %&gt;%
-  rounding_Xtable(digits = list(OR = .2, P_value = .3, P_value_adj = .3),
+  rounding_Xtable(digits = list(OR = .2, P_value = .3, P_value_adj = .3, Pos = .2),
                   ordenar = &quot;P_value&quot;) %&gt;%
   xtable(caption = &quot;Taula 1: Per cada SNP tenim l&#39;identificador, el model utilitzat 
   (model amb menor p-valor), l&#39;OR, el p-valor, el p-valor ajustat per la correcció 
