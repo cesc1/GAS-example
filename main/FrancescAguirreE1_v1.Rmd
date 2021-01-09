@@ -69,7 +69,7 @@ library(stringr)
 library(tableHTML)
 ```
 
-S'utilitzarà el paquet estadístic **SNPassoc** per facilitar l'anàlisi dels SNPs, i el paquet **magrittr** per la creació de pipelines. El paquet **FactoMineR** pot ajudar amb a fer un càlcul ràpid de les components principals per l'ajust del model genètic, i **MASS** per la selecció de variables i histogrames.
+S'utilitzarà el paquet estadístic **SNPassoc** per facilitar l'anàlisi genètica, i el paquet **magrittr** per la creació de pipelines. El paquet **FactoMineR** pot ajudar a fer un càlcul ràpid de les components principals per l'ajust del model genètic, i **MASS** per la selecció de variables i histogrames.
 
 També s'utilitzen algunes funcions de **purrr** per aplicar funcions similars al conjunt base apply. Els paquets **rvest** i **stringr** s'han fet servir per l'exercici suplementari de web scrapping que he proposat. **tableHTML** s'ha fet servir per afegir colors a la taula de resultats.
 
@@ -87,12 +87,12 @@ asthma$copd <- factor(asthma$copd)
 source(paste0(root_path, "/code/GEA.R"))
 ```
 
-S'han utilitzat les dades d'un estudi epidemiologic sobre l'asma, que conté `r nrow(asthma)` individus agrupats en casos i controls. Es tenen `r ncol(asthma) - 6` SNPs, a més del país, sexe, edat, bmi i nivell d'obstrucció pulmonar dels individus.
+S'han utilitzat les dades d'un estudi epidemiològic sobre l'asma, que conté `r nrow(asthma)` individus agrupats en casos i controls. Es tenen `r ncol(asthma) - 6` single-nucleotide polymorphisms (SNPs), a més del país, sexe, edat, bmi i nivell d'obstrucció pulmonar dels individus.
 
 
 ## 2.2 Anàlisi descriptiva no genètica
 
-En aquest primer anàlisi descriptiu de les variables no genètiques, es busca una visualització ràpida de la distribució de les variables. També s'intenta detectar possibles errors de mostreig que puguin crear biaix en el futur anàlisi.
+En aquesta primera anàlisi descriptiva de les variables no genètiques, es busca una visualització ràpida de la distribució de les variables. També s'intenta detectar possibles errors de mostreig que puguin crear biaix en el futur anàlisi.
 
 ### 2.2.1 Anàlisi univariant
 
@@ -104,7 +104,7 @@ univariant_table <- create_table(asthma[, var_names], var_names) %>%
   print(type = "html", include.rownames = FALSE)
 ```
 
-La Taula 1 d'estadístics univariants ens mostra el percentatge per cada nivell en variables categòriques, o els quartils en dades numèriques (mediana si es detecta asimetria, mitjana si no es detecta). Hi ha uns 4 cops més casos d'asma que controls, tot i que aquesta proporció no és tant elevada com per ser preocupant. El nombre d'individus per paísos no està equilibrat. Es detecta la presencia de valors perduts (ej: 12 valors perduts en bmi).
+La Taula 1 d'estadístics univariants ens mostra el percentatge per cada nivell en variables categòriques, o els quartils en dades numèriques (mediana si es detecta asimetria, mitjana si no es detecta). Hi ha uns 4 cops més casos d'asma que controls, tot i que aquesta proporció no és tan elevada com per ser preocupant. El nombre d'individus per països no està equilibrat. Es detecta la presència de valors perduts (ej: 12 valors perduts en bmi).
 
 ### 2.2.2 Anàlisi bivariant
 
@@ -116,7 +116,7 @@ rbind(bi_cat_table(asthma$country, asthma$caco, var_names[1]),
   print(type = "html", include.rownames = FALSE)
 ```
 
-La Taula 2 de contingència, es tenen els casos i controls d'asma, segons el país i el sexe. Es detecta que de Belgium i Estonia es tenen pocs individus, i només s'observen casos. També es tenen proporcions diferents de casos i controls segons el país. Això crea un problema si es vol utilitzar el país com a variable d'ajust. Com que els strats no estan equilibrats, els models logistics poden crear un biaix important, per tant s'exclourà aquesta variable com a ajust.
+La Taula 2 de contingència, es tenen els casos i controls d'asma, segons el país i el sexe. Es detecta que de Belgium i Estonia es tenen pocs individus, i només s'observen casos. També es tenen proporcions diferents de casos i controls segons el país. Això crea un problema si es vol utilitzar el país com a variable d'ajust. Com que els strats no estan equilibrats, els models logístics poden crear un biaix important. Per aquest motiu, s'exclourà el país com a variable d'ajust.
 
 ```{r, eval = T, echo = F, fig.align = "center", fig.width = 10, fig.height = 5, fig.cap="Gràfic 1: Plot univariant i bivariant de les variables numèriques"}
 par(mfrow = c(1, 2))
@@ -145,28 +145,28 @@ asthma[complete.cases(asthma$bmi), ] %>%
 legend("topright", legend = c("Casos", "Controls"), col = c("red", "blue"), lty = 1)
 ```
 
-El gràfic 1 mostra l'histogràma és la distribució de les variables edat i bmi, i les línies de colors són les densitats per casos i per controls. No es veuem majors diferències entre casos i controls. Es detecta una posible mixtura de normals en l'edat, i cua pesada per la dreta en el bmi (té sentit en el cas de bmi).
+El gràfic 1 és la distribució mostral de les variables edat i bmi, i les línies de colors són les densitats per casos i controls. No es veuen majors diferències entre casos i controls. Es detecta una possible mixtura de normals en l'edat, i cua pesada per la dreta en el bmi (és d'esperar la cua en el bmi).
 
 
 ## 2.3 Control de qualitat
 
 ### 2.3.1 Data Cleaning
 
-SNPs que continguin un nombre de valors perduts (individus) superior al 5%, s'eliminaran de l'anàlisi, ja que un nombre tant elevat de valors perduts podria esbiaixar els resultats. Es pot conciderara veure si hi ha hagut problemes en la lectura del genotip.
+SNPs que continguin un nombre de valors perduts (individus) superior al 5%, s'eliminaran de l'anàlisi, ja que un nombre tan elevat de valors perduts podria esbiaixar els resultats.
 
 S'ha creat la funció *remove_NA()* per aplicar aquest pas en una pipeline.
 
 ### 2.3.2 HWE Control
 
-S'han comprobat les freqüències dels anels individuals amb les poblacionals, a partir del test de HWE. SNPs amb un p-valor no significatiu (menor que 0.05) dins de la distribució dels controls, s'eliminaran de l'anàlisi.
+S'han comprobat les freqüències dels al·lels individuals amb les poblacionals, a partir del test de Hardy-Weinberg (HWE). SNPs amb un p-valor significatiu (menor que 0.05) dins de la distribució dels controls, s'eliminaran de l'anàlisi.
 
 S'ha creat la funció *remove_HWE()* per aplicar aquest pas en una pipeline.
 
 ### 2.3.3 Aplicant pipeline
 
-Utilitzar una pipeline per a transformacions d'un dataset ajuda a mantenir un ordre al aplicar les funcions, ajuda visualment i fa el codi fàcilment reproduible.
+Utilitzar una pipeline per a transformacions d'un dataset ajuda a mantenir un ordre en aplicar les funcions, ajuda visualment i fa el codi fàcilment reproduïble i reutilitzable.
 
-S'han aplicat les transformacions anteriors en el següent ordre: 
+S'han aplicat les transformacions anteriors en l'ordre següent: 
 
 1. Transformem les dades en classe **snp**.
 2. Eliminem els SNPs amb un nombre de valors perduts superiors al 5%.
@@ -195,13 +195,11 @@ S'han eliminat `r ncol(asthma) - ncol(dat)` SNPs que no complien les condicions 
 
 ### 2.4.1 Variables d'ajust
 
-Per a triar les variables d'ajust en els nostres models genètics, és fer-ho a partir de variables que sabem que influeixen a tenir asma. Algunes habituals són el sexe i l'edat.
+Per a triar les variables d'ajust en els nostres models genètics, una opció és fer-ho a partir de variables que sabem que influeixen a tenir asma. Algunes habituals són el sexe i l'edat.
 
-També pot ser que un no tenim molta idea sobre quines variables poden influir. En aquest cas, de les variables suggerides en les dades *asthma*, es farà un procediment de selecció de variables pas a pas per saber per quines ajustar.
+En el nostre cas, no tenim una idea clara sobre quines variables poden influir. Es seguirà el següent procediment: De les variables suggerides en les dades *asthma*, es farà un procediment de selecció de variables pas a pas per saber per quines ajustar. S'utilitzarà el mètode *stepAIC* amb direcció = "both" de la llibreria **MASS**, que selecciona o exclou variables a partir de l'AIC que aportin al model.
 
-S'utilitzarà el mètode *stepAIC* amb direcció = "both" de la libreria **MASS**, que selecciona o exclou variables a partir de l'AIC que aportin al model.
-
-Com s'ha comentat a la secció 2.2.2 d'anàlisi descriptiva, no s'utilitzarà la variable *paísos* perquè els strats no estan equilibrats.
+Com s'ha comentat a la secció 2.2.2 d'anàlisi descriptiva, no s'utilitzarà la variable *països* perquè els strats no estan equilibrats.
 
 ```{r}
 mod0 <- glm(caco ~ gender + age + bmi, family = binomial, data = dat)
@@ -215,12 +213,12 @@ summary(mod1)$coef[, c(1, 4)] %>%
   print(type = "html", include.rownames = TRUE)
 ```
 
-És selecciona el model complet, on veiem que totes les variables són significatives.
+Es selecciona el model complet, on totes les variables són significatives.
 
 
 ### 2.4.2 Components Principals
 
-Quan es treballa amb diferents poblacions (strats), és important tenir en compte que hi poden haver diferències en les freqüències al·lèliques, segons l'strat.
+Quan es treballa amb diferents poblacions (strats), és important tenir en compte que hi pot haver diferències en les freqüències al·lèliques, segons l'strat.
 
 Per resoldre aquest problema, a part d'ajustar per les variables no genètiques, es recomana ajustar per les primeres components principals del genotip codificat.
 
@@ -228,9 +226,9 @@ A tenir en compte:
 
 - S'ha utilitzat codificació additiva.
 
-- S'han centrat i escalat les dades. Si no s'escalen les dades, la primera component capta més del 50% de la variabilitat explicada, a conseqüència dels SNPs amb més allels minoritaris. També s'ha escalat per variància unitaria, perquè s'ha observat diferències en les variàncies dels SNPs. La funció *PCA* de la llibreria **MASS** s'encarrega de centrar i escalar.
+- S'han centrat i escalat les dades. Si no s'escalen les dades, la primera component capta més del 50% de la variabilitat explicada, a conseqüència dels SNPs amb més al·lels minoritaris. També s'ha escalat per variància unitària, perquè s'han observat diferències en les variàncies dels SNPs. La funció *PCA* de la llibreria **MASS** s'encarrega de centrar i escalar.
 
-- Per aplicar PCA no es poden tenir valors perduts. Per calcular les components, només s'han utilitzats els individus amb casos complets, el que ha eliminat uns 200 individus de la mostra. Aquest pas s'ha implementat en la fució *gen_to_num()* Es podria plantejar si un millor mètode d'amputació és una opció millor.
+- Per aplicar PCA, no es poden tenir valors perduts. Per calcular les components, només s'han utilitzat els individus amb casos complets, el que ha eliminat uns 200 individus de la mostra. Aquest pas s'ha implementat en la funció *gen_to_num()* Es podria plantejar si un millor mètode d'amputació és una millor opció.
 
 ```{r}
 pca <- dat[, snp_names] %>%
@@ -250,18 +248,18 @@ plot(pca$eig[1:15, 3], type = "b", ylab = "% variancia explicada acumulada", xla
 abline(h = pca$eig[4, 3], col = "red") # Agafem 4 comp
 ```
 
-Per elegir el nombre de components, un es pot fixar en el Gràfic 2, fet a partir dels valors propis resultants (% variancia explicada). En el gràfic de l'esquerra es s'observa un colze després de la quarta component, i tot seguit s'estabilitza linealment. Això indica que elegir quatre components pot ser una bona opció. Les quatre components expliquen més del 40% de la variabilitat explicada per els SNPs. Per ajustar el model genètic, tenint en compte que estem en un estudi GAS amb poques dades, aquesta quantitat és suficient.
+Per elegir el nombre de components, s'ha creat el Gràfic 2, fet a partir dels valors propis resultants (% variància explicada). En el gràfic de l'esquerra, es pot veure un colze després de la quarta component, i tot seguit s'estabilitza linealment (es veu un segon colze en la component 9). Això indica que elegir quatre components pot ser una bona opció. Les quatre components expliquen més del 40% de la variabilitat explicada pels SNPs. Per ajustar els models genètics, tenint en compte que estem en un estudi GAS amb poques dades, aquesta quantitat s'ha considerat apropiada.
 
 
 ## 2.5 Models d'associació genètica
 
-Per cada SNP, es crearan 3 models logistics: Dominant, Recessiu i log-Aditiu. Es seleccionarà el model amb el p-valor més baix dels 3.
+Per cada SNP, s'han creat 3 models logístics: Dominant, Recessiu i log-Aditiu. Es seleccionarà el model amb el p-valor més baix dels 3.
 
-Per investigar l'efecte que pot tenir ajustar per components principals, és interessant fer l'anàlisi ajustant per els 4 components principals, i després fer-lo sense aquest ajust.
+Per investigar l'efecte que pot tenir ajustar per components principals, és interessant fer l'anàlisi ajustant pels 4 components principals, i després fer-lo sense aquest ajust, per veure les diferències en els resultats.
 
-També, un cop calculats els p-valors, s'ajustarà per la correcció de Benjamini-Hochberg.
+També, un cop calculats els p-valors, com que s'estan fent tests múltiples, s'ajustarà per la correcció de Benjamini-Hochberg.
 
-S'ha creat la funció *associationAll()* per aplicar aquest anàlisi a tots ens SNPs, i extreure els resultats en una taula.
+S'ha creat la funció *associationAll()* per aplicar els models a tots els SNPs, i extreure els resultats en una taula.
 
 ```{r, warning = F}
 taula <- associationAll("caco ~ gender + age + bmi + PC$PC1 + PC$PC2 + PC$PC3 + PC$PC4",
@@ -276,24 +274,24 @@ colnames(taula_noPCA) <- paste0(colnames(taula_noPCA), "_NoPCA")
 taula <- cbind(taula, taula_noPCA)
 ```
 
-Ja tenim la taula amb els p-valors ajustats! Recordar que també s'han afegit els p-valors quan no s'ha ajustat per PCA, per comparar l'ajust d'aquest. La Taula 4 es pot trobar a la secció 2.6.
+Ja tenim la taula amb els p-valors ajustats! Recordar que també s'han afegit els p-valors quan no s'ha ajustat per PCA, per comparar l'ajust de les components. La Taula 4 es pot trobar a la secció 2.7.
 
 
-## 2.6 Busqueda per Gen
+## 2.6 Cerca dels Gen
 
 Per fer l'anàlisi de xarxes de gens, s'ha de saber de quin gens provenen els SNPs més significatius. 
 
 Es tenen diferents opcions per obtenir aquesta informació:
 
-1. Anar a [dbSNP](https://www.ncbi.nlm.nih.gov/snp/) i buscar aquesta informació manualment. És viable quan tenim una quantitat de SNPs significatius petita, com és el nostre cás.
+1. Anar a [dbSNP](https://www.ncbi.nlm.nih.gov/snp/) i buscar aquesta informació manualment. És viable quan tenim una quantitat de SNPs significatius petita, com és el nostre cas.
 
 2. Utilitzar **web scrapping**. Extreure la informació que volem manualment pot ser un procés repetitiu. Programar pot servir per automatitzar aquestes tasques.  
 
-3. Busqueda directa a partir d'una base de dades que ja contingui aquesta informació. És una opció molt més ràpida que web scrapping, per quan tenim grans quantitats de dades (ej: Utilitzant SQL).
+3. Cerca directa a partir d'una base de dades que ja contingui aquesta informació. És una opció molt més ràpida que web scrapping, per quan tenim grans quantitats de dades (ej: Utilitzant SQL).
 
-Ja que s'ha esmentat web scrapping com a opció, s'ha realitzat un exemple d'aquesta tècnica amb els SNPs del nostre anàlisi per il·lustrar aquest procés.
+Ja que s'ha esmentat web scrapping com a opció, s'ha realitzat un exemple d'aquesta tècnica amb els SNPs de la nostra anàlisi per il·lustrar aquest procés.
 
-Utilitzar web scrapping en el meu ordinador personal tarda al voltant d'1s/busqueda. Aquest temps depen de la connexió a internet que es tingui, capacitat computacional... És més ràpid que fer-ho manualment, però no és poden fer milers de busquedes sense gastar hores de capacitat computacional en un ordinador personal. És ideal per tasques com, buscar informació de 200 snps, amb un temps d'entre 3 i 5 minuts.
+Utilitzar web scrapping en el meu ordinador personal tarda al voltant d'1s/busqueda. Aquest temps depen de la connexió a internet que es tingui, capacitat computacional... És més ràpid que fer-ho manualment, però no es poden fer milers de cerques sense gastar hores de capacitat computacional en un ordinador personal. És ideal per tasques com, buscar informació de 200 snps, amb un temps d'entre 3 i 5 minuts.
 
 
 ```{r}
@@ -311,7 +309,7 @@ data_web <- lapply(snp_names, function(snp_name){
 taula_resultats <- cbind(taula, data_web)
 ```
 
-Un dels SNPs no s'ha trobat, i particularment comença amb un prefix (hopo) diferent a la resta (rs).
+Un dels SNPs no s'ha trobat, i particularment comença amb un prefix (hopo) diferent de la resta (rs).
 
 
 ## 2.7 Taula de resultats
@@ -323,7 +321,7 @@ taula_resultats %>%
                                 "Pos" = .2), ordenar = "P_value_PCA") %>%
   tableHTML(rownames = FALSE, footer = 
   "Taula 4: Per cada SNP tenim l'identificador i el model utilitzat 
-  (model amb menor p-valor). També es té l'OR, el p-valor, el p-valor corregint per Benjamini-Hochberg, i les mateixes 3 columnes sense ajustar per components principals. Finalment es té informació univariant sobre l'SNP (gen, chromozoma, posició del cromozoma Mb). Tenir en compte que per el model no ajustat per PCA, el model pot ser diferent al que s'indica.") %>%
+  (model amb menor p-valor). També es té l'OR, el p-valor, el p-valor corregint per Benjamini-Hochberg, i les mateixes 3 columnes sense ajustar per components principals. Finalment es té informació univariant sobre l'SNP (gen, chromozoma, posició del cromozoma Mb). Tenir en compte que per els models no ajustats per PCA, el model type pot ser diferent al que s'indica.") %>%
   add_css_column(css = list("background-color", "yellow"),
                             columns = c("OR_PCA", "OR_NoPCA")) %>%
   add_css_column(css = list("background-color", "#FF9999"),
@@ -333,23 +331,23 @@ taula_resultats %>%
   
 ```
 
-Si s'és estricte amb la significació, no s'ha trobat cap SNP significatiu després d'ajustar per la correcció de Benjamini-Hochberg. Tot i no ser estrictament significatiu, un snp que s'apropa al llindar és l'snp amb id rs324960, amb un p-valor ajustat de 0.064. Cal notar que la correcció de Benjamini-Hochberg fa augmentar molt el p-valor, ja que abans d'ajustar teniem un p-valor menor que 0.001. El model utilitzat per l'id rs324960 és el recessiu, i l'OR és 0.38. Això indica que les odds de patir asma són un 163% menors si l'allel de l'individu és menor homozigot, respecte a si no ho és.
+Si s'és estricte amb la significació, no s'ha trobat cap SNP significatiu després d'aplicar la correcció de Benjamini-Hochberg. Tot i no ser estrictament significatiu, un snp que s'apropa al llindar és l'snp amb id rs324960, amb un p-valor corregit de 0.064. Cal notar que la correcció de Benjamini-Hochberg fa augmentar molt el p-valor, ja que abans d'aplicar la correcció, teníem un p-valor menor que 0.001. El model utilitzat per l'id rs324960 és el recessiu, i l'OR és 0.38. Això indica que les odds de patir asma són un 163% menors si l'al·lel de l'individu és menor homozigot, respecte a si no ho és.
 
-Els SNPs amb id rs1422993 i rs10486657 inicialment tenien un p-valor significatiu (0.008 i 0.034 respectivament), però al ajustar han perdut la significació (0.165, 0.351).
+Els SNPs amb id rs1422993 i rs10486657 inicialment tenien un p-valor significatiu (0.008 i 0.034 respectivament), però en corregir, han perdut la significació (0.165, 0.351).
 
-També s'han vist algunes curiositats comparant l'anàlisi amb l'ajust per PCA i sense aquest ajust. Aplicar l'ajust ha fet que alguns SNPs que abans eren significatius (rs184448), ho deixin de ser, indicant cert biaix si no s'aplica l'ajust. També han disminuit alguns dels p-valors més significatius que s'han trobat, en concret l'snp amb id rs10486657.
+També s'han vist algunes curiositats comparant l'anàlisi amb l'ajust per PCA i sense aquest ajust. Aplicar l'ajust per PCA ha fet que alguns SNPs que sense l'ajust eren significatius (rs184448), ho deixin de ser, indicant cert biaix per freqüències al·lèliques si no s'aplica l'ajust. També han disminuït alguns dels p-valors més significatius que s'han trobat, en concret l'snp amb id rs10486657, on sense l'ajust per PCA té un p-valor no corregit de 0.332, i ajustant té un p-valor de 0.034.
 
-Com pocs SNPs s'han arribat a conciderar significatius, no es pot investigar comodament sobre els gens o xarxes genètiques.
+Com que només un dels SNPs es podria arribar a considerar significatiu, no té molt de sentit fer una anàlisi sobre els gens o xarxes genètiques. Això és degut al fet que no es pot observar una tendència amb SNPs significatius del mateix gen.
 
 ## 2.8 Gràfics Manhattan de regions puntuals
 
-S'han fet manhattan plots de les regions amb p-valors més significatius amb l'eina [LocusZoom](http://locuszoom.org/genform.php?type=yourdata). Primer s'ha de guardar la taula en un fitxer.
+S'han fet manhattan plots de les regions amb els p-valors més significatius, amb l'eina [LocusZoom](http://locuszoom.org/genform.php?type=yourdata). Primer s'ha de guardar la taula en un fitxer.
 
-```{r echo = T, eval = F}
-write.table(taula_resultats, "data/taulaORs.txt", quote = FALSE, row.names = FALSE)
+```{r echo = T, eval = T}
+write.table(taula_resultats, paste0(root_path, "/data/taulaORs.txt"), quote = FALSE, row.names = FALSE)
 ```
 
-Tot seguit s'anirà a [LocusZoom](http://locuszoom.org/genform.php?type=yourdata) per fer el plot. S'entra el fitxer .txt generat, la columna de p-valors ajustats, s'indica la columna amb els noms dels SNPs i el delimitador s'especifica per espais. 
+Tot seguit s'anirà a [LocusZoom](http://locuszoom.org/genform.php?type=yourdata) per fer el plot. S'entra el fitxer .txt generat, la columna de p-valors ajustats, s'indica la columna amb els noms dels SNPs, el delimitador s'especifica per espais i s'indica el SNP on volem centrar el gràfic. 
 
 ```{r echo = F, eval = T, fig.align = 'center', out.width = "80%", fig.cap = "Grafic 2: Manhattan plot centrat en el SNP rs324960"}
 knitr::include_graphics(paste0(root_path, "/images/manhattanP1.png"))
@@ -359,20 +357,20 @@ knitr::include_graphics(paste0(root_path, "/images/manhattanP1.png"))
 knitr::include_graphics(paste0(root_path, "/images/manhattanP2.png"))
 ```
 
-En el Gràfic 2, s'ha representat la zona on es troba l'snp més significatiu trobat rs324960. Es troba més elevat que la resta, que es mantenen a un nivell inferior a 2. Aquesta distancia ens dona alguns motius per arribar a conciderar l'snp com a significatiu.
+En el Gràfic 2, s'ha representat la zona on es troba l'snp amb un p-valor més baix rs324960. Es troba uns dos cops més elevat que la resta, que es mantenen a un nivell inferior a 2. Aquesta distància ens dóna un motiu per arribar a considerar l'snp com a significatiu.
 
 En el Gràfic 3, el nombre de SNPs és molt baix (quatre) i extreure les mateixes conclusions és més difícil que en el Gràfic 2.
 
 
 # 3. Conclusions
 
-Tot i que no s'han trobat variants genètiques significatives que augmentin els odds de patir asma, s'ha vist que la variant rs324960 pot influir a disminuir els odds de patir asma al estar present com a menor homozigot, respecte no estar present com a menor homozigot. 
+Tot i que no s'han trobat variants genètiques significatives que augmentin els odds de patir asma, s'ha vist que la variant rs324960 pot influir a disminuir els odds de patir asma a l'estar present com a menor homozigot, respecte no estar present, com a menor homozigot. 
 
 
 # ANNEX
 
-El codi d'aquesta entrega es pot trobar en github: [cesc1/GAS-example](https://github.com/cesc1/GAS-example).
+El codi d'aquesta entrega es pot trobar a github: [cesc1/GAS-example](https://github.com/cesc1/GAS-example).
 
-- code: Funcions utilitzades en la entrega.
+- code: Funcions utilitzades en l'entrega.
 - main: Document .Rdm amb el respectiu .html entregat.
 - data: Dades utilitzades asthma, i taules de dades creades.
