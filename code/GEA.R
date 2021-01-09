@@ -96,6 +96,28 @@ associationOut <- function(base_formula, snpID, data, ajust = TRUE){
 }
 
 
+### Name: associationAll
+## Desc: Funció que crea els models logistics per tots els SNP, aplicant associationOut()
+## Packages: SNPassoc
+## Arguments: 
+  # base_formula: Formula de la part ajustada. character. ej: "caco ~ gender + sex". character
+  # snpIDs: IDs dels SNPs. character vector.
+  # data: Objecte setupSNP.
+  # ajust: si no volem ajustar, podem posar ajust = FALSE. La formula sera ej: "caco ~". boolean
+## Retorna: data.frame
+
+associationAll <- function(base_formula, snpIDs, data, ajust = TRUE){
+  taula_res <- snpIDs %>%
+    lapply(associationOut, 
+           base_formula = base_formula, data = data, ajust = ajust) %>%
+    do.call(what = rbind)
+  taula_res$P_value_adj <- p.adjust(taula_res$P_value, method = "BH")
+  return(taula_res)
+}
+
+
+
+
 ### Name: rounding_Xtable
 ## Desc: Arrodoneix els digits de les columnes que volem, i els transforma tipus char (per Xtable).
   # També es pot ordenar una de les columnes a priori. 
@@ -107,6 +129,14 @@ associationOut <- function(base_formula, snpID, data, ajust = TRUE){
 ## Retorna: Taula amb les columnes arrodonides com a characters. data.frame.
 
 rounding_Xtable <- function(data, digits, ordenar = NULL){
+  # Datacheck
+  if(!is.data.frame(data)){
+    if(is.matrix(data)){
+      data <- as.data.frame(data)
+    }else{
+      stop("La classe de data ha de ser matrix/data.frame")
+    }
+  }
   # Digit names check
   if(any(!names(digits) %in% names(data))){
     stop("Algun dels noms de digits no coincideix amb data")
@@ -132,4 +162,15 @@ rounding_Xtable <- function(data, digits, ordenar = NULL){
   return(data)
 }
 
+
+## PCA
+
+gen_to_num <- function(data){
+  numdata <- data %>% # Model aditiu
+    sapply(as.numeric) %>%
+    subtract(1) %>%
+    data.frame() %>%
+    extract(complete.cases(data), ) # De moment apliquem casos complets per no complicar
+  return(numdata)
+}
 

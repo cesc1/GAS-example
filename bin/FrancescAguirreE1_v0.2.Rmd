@@ -123,9 +123,13 @@ S'han eliminat `r ncol(asthma) - ncol(dat)` SNPs que no complien les condicions 
 
 ## 1.3 Selecció de variables no genètiques
 
+
 ```{r}
-mod <- glm(caco ~ country + gender + age + bmi, family = binomial, data = dat)
-round(summary(mod)$coef, 3)
+mod0 <- glm(caco ~ country + gender + age + bmi, family = binomial, data = dat)
+
+mod1 <- MASS::stepAIC(mod0, trace = T)
+
+round(summary(mod1)$coef, 3)
 ```
 
 Veiem que totes les variables són significatives, i hi ha països que disminueixen les odds de tenir asma en referència a austràlia, i d'altres que no. Això ens diu, que ajustar els nostres models d'associació per aquestes variables pot ser encertat, per tal de disminuir el biaix quan es conclou que un SNP és significatiu.
