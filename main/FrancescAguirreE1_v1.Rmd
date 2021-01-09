@@ -1,8 +1,8 @@
 ---
-title: "Entrega 1: Genetic Aassociation Studies"
+title: "Entrega 1: Genetic Association Studies"
 subtitle: "Big Data en Biociències"
 author: "Francesc Aguirre, 1398024"
-date: "Desembre de 2020"
+date: "Gener de 2021"
 output:
   html_document: 
     toc: true
@@ -277,7 +277,7 @@ taula <- cbind(taula, taula_noPCA)
 Ja tenim la taula amb els p-valors ajustats! Recordar que també s'han afegit els p-valors quan no s'ha ajustat per PCA, per comparar l'ajust de les components. La Taula 4 es pot trobar a la secció 2.7.
 
 
-## 2.6 Cerca dels Gen
+## 2.6 Cerca del Gen
 
 Per fer l'anàlisi de xarxes de gens, s'ha de saber de quin gens provenen els SNPs més significatius. 
 
@@ -321,7 +321,7 @@ taula_resultats %>%
                                 "Pos" = .2), ordenar = "P_value_PCA") %>%
   tableHTML(rownames = FALSE, footer = 
   "Taula 4: Per cada SNP tenim l'identificador i el model utilitzat 
-  (model amb menor p-valor). També es té l'OR, el p-valor, el p-valor corregint per Benjamini-Hochberg, i les mateixes 3 columnes sense ajustar per components principals. Finalment es té informació univariant sobre l'SNP (gen, chromozoma, posició del cromozoma Mb). Tenir en compte que per els models no ajustats per PCA, el model type pot ser diferent al que s'indica.") %>%
+  (model amb menor p-valor). També es té l'OR, el p-valor, el p-valor corregint per Benjamini-Hochberg, i les mateixes 3 columnes sense ajustar per components principals. Finalment es té informació univariant sobre l'SNP (gen, chromozoma, posició del cromosoma Mb). Tenir en compte que per els models no ajustats per PCA, el model type pot ser diferent al que s'indica.") %>%
   add_css_column(css = list("background-color", "yellow"),
                             columns = c("OR_PCA", "OR_NoPCA")) %>%
   add_css_column(css = list("background-color", "#FF9999"),
@@ -357,9 +357,11 @@ knitr::include_graphics(paste0(root_path, "/images/manhattanP1.png"))
 knitr::include_graphics(paste0(root_path, "/images/manhattanP2.png"))
 ```
 
-En el Gràfic 2, s'ha representat la zona on es troba l'snp amb un p-valor més baix rs324960. Es troba uns dos cops més elevat que la resta, que es mantenen a un nivell inferior a 2. Aquesta distància ens dóna un motiu per arribar a considerar l'snp com a significatiu.
+En els Gràfics 2 i 3, tenim el manhattan plot d'una regió concreta dels cromosomes 7 i 5 respectivament. En l'eix d'ordenades tenim el negatiu del logaritme en base 10 del p-valor no corregit, calculat en la secció 2.5, i que es pot veure en la taula 4 de la secció 2.7. En l'eix d'abscisses, tenim la posició on es troba cada SNP en el cromosoma, en milions de bases (Mb).
 
-En el Gràfic 3, el nombre de SNPs és molt baix (quatre) i extreure les mateixes conclusions és més difícil que en el Gràfic 2.
+En el Gràfic 2, s'ha representat la zona on es troba l'snp amb el p-valor més baix rs324960. Es troba uns dos cops més elevat que la resta, que es mantenen a un nivell inferior a 2. Aquesta distància ens dóna un motiu per arribar a considerar l'snp com a significatiu.
+
+En el Gràfic 3, s'ha representat la zona on es troba el segon snp amb el p-valor més baix rs1422993. El nombre de SNPs és molt baix (quatre) en aquesta zona, no podem extreure les mateixes conclusions que en el Gràfic 2.
 
 
 # 3. Conclusions
