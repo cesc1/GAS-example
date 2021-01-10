@@ -84,7 +84,7 @@ root_path = getwd()
 asthma <- read.table(paste0(root_path, "/data/asthma.txt"), header=TRUE)
 asthma$caco <- factor(asthma$caco)
 asthma$copd <- factor(asthma$copd)
-source(paste0(root_path, "/code/GEA.R"))
+source(paste0(root_path, "/code/GAS.R"))
 ```
 
 S'han utilitzat les dades d'un estudi epidemiològic sobre l'asma, que conté `r nrow(asthma)` individus agrupats en casos i controls. Es tenen `r ncol(asthma) - 6` single-nucleotide polymorphisms (SNPs), a més del país, sexe, edat, bmi i nivell d'obstrucció pulmonar dels individus.
